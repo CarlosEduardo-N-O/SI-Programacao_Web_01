@@ -1,0 +1,28 @@
+* {
+    padding: 0;
+    margin: 0;
+}
+
+fieldset {
+    background-color: silver;
+    padding: 5px;
+}
+
+.inicio {
+    background-color: blue;
+    margin: 10px;
+}
+
+.meio {
+    background-color: SlateGray;
+    margin: 10px;
+}
+
+.fim {
+    background-color: SlateGray;
+    margin: 10px;
+}
+
+.botoes {
+    margin: 10px;
+}
