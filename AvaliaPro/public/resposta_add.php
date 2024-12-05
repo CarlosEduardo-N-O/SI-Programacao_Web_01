@@ -8,53 +8,61 @@ if (!isset($_SESSION['id_dispositivo']) || !isset($_SESSION['id_setor']) || !iss
     exit();
 }
 
-// Obtém o id do dispositivo, setor e avaliação da sessão
 $id_dispositivo = $_SESSION['id_dispositivo'];
 $id_setor = $_SESSION['id_setor'];
 $id_avaliacao = $_SESSION['id_avaliacao'];
 
-// Busca todas as perguntas ordenadas por 'ordem' para o setor
 $stmt = $pdo->prepare("SELECT id_pergunta, pergunta, ordem FROM pergunta WHERE id_setor = ? AND status = true ORDER BY ordem ASC");
 $stmt->execute([$id_setor]);
 $perguntas = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// Verifica o índice atual da pergunta sendo exibida
 if (!isset($_SESSION['indice_pergunta'])) {
-    $_SESSION['indice_pergunta'] = 0; // Começa da primeira pergunta
+    $_SESSION['indice_pergunta'] = 0;
 }
 
-// Total de perguntas
 $total_perguntas = count($perguntas);
 
-// Processa a navegação do formulário
 if (isset($_POST['acao'])) {
-    // Salva a resposta da pergunta atual
     $indice_atual = $_SESSION['indice_pergunta'];
     $id_pergunta_atual = $perguntas[$indice_atual]['id_pergunta'];
     $resposta = isset($_POST['resposta']) ? $_POST['resposta'] : null;
     $descricao = isset($_POST['descricao']) ? $_POST['descricao'] : '';
 
     if ($resposta !== null) {
-        // Salva a resposta no banco de dados
-        $stmt = $pdo->prepare("INSERT INTO resposta (id_avaliacao, id_pergunta, id_dispositivo, id_setor, resposta, descricao) VALUES (?, ?, ?, ?, ?, ?)");
-        $stmt->execute([$id_avaliacao, $id_pergunta_atual, $id_dispositivo, $id_setor, $resposta, $descricao]);
+        $stmt = $pdo->prepare("SELECT COUNT(*) FROM resposta WHERE id_avaliacao = ? AND id_pergunta = ? AND id_dispositivo = ?");
+        $stmt->execute([$id_avaliacao, $id_pergunta_atual, $id_dispositivo]);
+        $existe = $stmt->fetchColumn();
+
+        if ($existe > 0) {
+            $stmt = $pdo->prepare("UPDATE resposta SET resposta = ?, descricao = ? WHERE id_avaliacao = ? AND id_pergunta = ? AND id_dispositivo = ?");
+            $stmt->execute([$resposta, $descricao, $id_avaliacao, $id_pergunta_atual, $id_dispositivo]);
+        } else {
+            $stmt = $pdo->prepare("INSERT INTO resposta (id_avaliacao, id_pergunta, id_dispositivo, id_setor, resposta, descricao) VALUES (?, ?, ?, ?, ?, ?)");
+            $stmt->execute([$id_avaliacao, $id_pergunta_atual, $id_dispositivo, $id_setor, $resposta, $descricao]);
+        }
     }
 
-    // Navegação entre perguntas
     if ($_POST['acao'] == 'proximo' && $_SESSION['indice_pergunta'] < $total_perguntas - 1) {
         $_SESSION['indice_pergunta']++;
     } elseif ($_POST['acao'] == 'anterior' && $_SESSION['indice_pergunta'] > 0) {
         $_SESSION['indice_pergunta']--;
     } elseif ($_POST['acao'] == 'enviar') {
-        // Caso o botão de envio seja pressionado na última pergunta, redirecione após o salvamento
         header("Location: resposta_salva.php");
         exit();
     }
+
+    header("Location: " . $_SERVER['PHP_SELF']);
+    exit();
 }
 
-// Obtenha a pergunta atual com base no índice
 $indice_atual = $_SESSION['indice_pergunta'];
 $pergunta_atual = $perguntas[$indice_atual];
+
+// Recupera a resposta salva, se houver
+$stmt = $pdo->prepare("SELECT resposta, descricao FROM resposta WHERE id_avaliacao = ? AND id_pergunta = ? AND id_dispositivo = ?");
+$stmt->execute([$id_avaliacao, $pergunta_atual['id_pergunta'], $id_dispositivo]);
+$resposta_salva = $stmt->fetch(PDO::FETCH_ASSOC);
+
 ?>
 
 <!DOCTYPE html>
@@ -220,7 +228,7 @@ $pergunta_atual = $perguntas[$indice_atual];
             left: 20px;
             /* Distância da esquerda */
         }
-    </style>
+        </style>
 </head>
 
 <body>
@@ -230,11 +238,12 @@ $pergunta_atual = $perguntas[$indice_atual];
                 <label><?php echo htmlspecialchars($pergunta_atual['pergunta']); ?></label>
                 <div class="radio-group">
                     <?php for ($i = 0; $i <= 10; $i++): ?>
-                        <input type="radio" id="resposta<?php echo $i; ?>" name="resposta" value="<?php echo $i; ?>" required>
+                        <input type="radio" id="resposta<?php echo $i; ?>" name="resposta" value="<?php echo $i; ?>"
+                            <?php echo (isset($resposta_salva['resposta']) && $resposta_salva['resposta'] == $i) ? 'checked' : ''; ?> required>
                         <label for="resposta<?php echo $i; ?>"><?php echo $i; ?></label>
                     <?php endfor; ?>
                 </div>
-                <textarea class="form-control mt-2" name="descricao" placeholder="Descrição (opcional)"></textarea>
+                <textarea class="form-control mt-2" name="descricao" placeholder="Descrição (opcional)"><?php echo isset($resposta_salva['descricao']) ? htmlspecialchars($resposta_salva['descricao']) : ''; ?></textarea>
             </div>
             <div class="btn-container">
                 <div class="btn-anterior">
@@ -252,8 +261,6 @@ $pergunta_atual = $perguntas[$indice_atual];
                     <?php endif; ?>
                 </div>
             </div>
-
-
         </form>
     </div>
     <div class="voltar-container">

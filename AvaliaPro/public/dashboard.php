@@ -13,16 +13,15 @@ function contarRegistros($pdo, $tabela)
 function obterEstatisticasComMediaEPerguntas($pdo)
 {
     $stmt = $pdo->query("
-        SELECT s.nome AS setor,
-               COUNT(r.id_resposta) AS total_respostas,
-               COUNT(DISTINCT p.id_pergunta) AS total_perguntas,
-               COALESCE(AVG(r.resposta), 0) AS media_respostas
-        FROM setor s
-        LEFT JOIN dispositivo d ON s.id_setor = d.id_setor
-        LEFT JOIN resposta r ON r.id_dispositivo = d.id_dispositivo
-        LEFT JOIN pergunta p ON p.id_setor = s.id_setor
-        GROUP BY s.nome
-        ORDER BY total_respostas DESC
+        SELECT S.NOME AS SETOR,
+               COUNT(R.ID_RESPOSTA) AS TOTAL_RESPOSTAS,
+               (SELECT COUNT(ID_PERGUNTA) FROM PERGUNTA WHERE ID_SETOR = S.ID_SETOR) AS TOTAL_PERGUNTAS,
+               COALESCE(AVG(R.RESPOSTA), 0) AS MEDIA_RESPOSTAS
+        FROM SETOR S
+        LEFT JOIN DISPOSITIVO D ON S.ID_SETOR = D.ID_SETOR
+        LEFT JOIN RESPOSTA R ON R.ID_DISPOSITIVO = D.ID_DISPOSITIVO
+        GROUP BY S.ID_SETOR
+        ORDER BY TOTAL_RESPOSTAS DESC
     ");
     $resultados = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
